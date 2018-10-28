@@ -19,7 +19,7 @@
           工单{{ this.$route.query.workid }}详细信息
           <br>
           <Button type="text" v-if="this.$route.query.status === 1" @click.native="_RollBack()">查看回滚语句</Button>
-          <Button type="text" v-else-if="this.$route.query.status === 0 && this.$route.query.type === 1"
+          <Button type="text" v-else-if="this.$route.query.status === 0 || this.$route.query.status ===4"
                   @click.native="PutData()">重新提交
           </Button>
           <Button type="text" v-if="this.$route.query.status === 2" @click.native="delorder()">工单撤销</Button>
@@ -57,12 +57,12 @@
             <FormItem label="数据库库名:">
               <p>{{formItem.basename}}</p>
             </FormItem>
-            <FormItem label="执行SQL:">
+            <FormItem>
               <template v-if="sqltype===0">
                 <Input v-model="sql" type="textarea" :rows="8"></Input>
               </template>
               <template v-else>
-                <p v-for="i in ddlsql">{{i}}</p>
+                <Table :columns="columnsName" :data="ddlsql" stripe border></Table>
               </template>
             </FormItem>
             <FormItem label="工单提交说明:">
@@ -89,6 +89,12 @@
     name: 'myorder-list',
     data () {
       return {
+        columnsName: [
+          {
+            title: '回滚语句',
+            key: 'sql'
+          }
+        ],
         tabcolumns: [
           {
             title: 'sql语句',
@@ -159,6 +165,7 @@
             this.formItem = res.data.data
             this.sql = res.data.sql
             this.sqltype = res.data.type
+            this.formItem.backup = '0'
           })
           .catch(error => {
             util.err_notice(error)
@@ -166,36 +173,20 @@
         this.reloadsql = true
       },
       _Putorder () {
-        if (this.sqltype === 0) {
-          let _tmpsql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-          axios.post(`${util.url}/sqlsyntax/`, {
-            'data': JSON.stringify(this.formItem),
-            'sql': JSON.stringify(_tmpsql),
-            'user': sessionStorage.getItem('user'),
-            'type': this.dmlorddl,
-            'id': this.formItem.bundle_id
+        let sql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+        axios.post(`${util.url}/sqlsyntax/`, {
+          'data': JSON.stringify(this.formItem),
+          'sql': JSON.stringify(sql),
+          'real_name': sessionStorage.getItem('real_name'),
+          'type': this.dmlorddl,
+          'id': this.formItem.bundle_id
+        })
+          .then(() => {
+            util.notice('工单已提交成功')
           })
-            .then(() => {
-              util.notice('工单已提交成功')
-            })
-            .catch(error => {
-              util.err_notice(error)
-            })
-        } else {
-          axios.post(`${util.url}/sqlsyntax/`, {
-            'data': JSON.stringify(this.formItem),
-            'sql': JSON.stringify(this.ddlsql),
-            'user': sessionStorage.getItem('user'),
-            'type': this.dmlorddl,
-            'id': this.formItem.bundle_id
+          .catch(error => {
+            util.err_notice(error)
           })
-            .then(() => {
-              util.notice('工单已提交成功')
-            })
-            .catch(error => {
-              util.err_notice(error)
-            })
-        }
       },
       delorder () {
         let _list = []
